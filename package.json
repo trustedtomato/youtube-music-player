@@ -1,0 +1,23 @@
+{
+  "name": "youtube-music-player",
+  "version": "1.0.0",
+  "description": "A better way to play music from YouTube.",
+  "private": true,
+  "dependencies": {
+    "clean-webpack-plugin": "^1.0.0",
+    "fs-extra": "^7.0.1",
+    "sortablejs": "^1.8.0-rc1",
+    "webpack": "^4.26.0",
+    "webpack-cli": "^3.1.2",
+    "webpack-dev-server": "^3.1.10",
+    "webpack-merge": "^4.1.4",
+    "worker-loader": "^2.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "build": "webpack --config webpack.prod.js",
+    "start": "webpack-dev-server --open --config webpack.dev.js"
+  },
+  "author": "Halasi Tamas",
+  "license": ""
+}
