@@ -140,6 +140,7 @@ customElements.define('ul-playlist', class extends HTMLUListElement{
 			delete this.currentChild.dataset.playing;
 		}
 		this.currentChild = child;
+		console.log(child);
 		if(child === null) return false;
 		child.dataset.playing = true;
 		child.createYtPlayer(this.videoContainer).then(async player => {
