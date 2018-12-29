@@ -16,12 +16,17 @@ const createYtPlayer = (function(){
 			videoId,
 			playerVars: {
 				controls: 0,
-				origin: window.origin
+				origin: window.origin,
+				fs: 0,
+				disablekb: 1
 			},
 			events: {
 				'onReady': () => {
 					setBestSoundQuality(player);
 					player.setVolume(100);
+					const iframe = player.getIframe();
+					iframe.removeAttribute('allowfullscreen');
+					iframe.setAttribute('donotallowfullscreen', '');
 					resolve(player);
 				}
 			}
@@ -135,6 +140,16 @@ customElements.define('ul-playlist', class extends HTMLUListElement{
 				player.getIframe().remove();
 			}
 			this.players = [player];
+			player.addEventListener('onStateChange', e => {
+				switch(e.data){
+					case YT.PlayerState.PLAYING:
+						this.play();
+						break;
+					case YT.PlayerState.PAUSED:
+						this.pause();
+						break;
+				}
+			});
 			if(this.playing){
 				this.play();
 			}
@@ -149,13 +164,16 @@ customElements.define('ul-playlist', class extends HTMLUListElement{
 		}
 	}
 	pause(){
+		if(!this.playing) return;
 		clearTimeout(this.endTimeout);
 		this.playing = false;
 		for(player of this.players){
 			player.pauseVideo();
 		}
+		this.dispatchEvent(new Event('pause'));
 	}
 	play(){
+		if(this.playing) return;
 		this.playing = true;
 		if(this.players.length === 0) return;
 
@@ -165,6 +183,14 @@ customElements.define('ul-playlist', class extends HTMLUListElement{
 		}, (player.getDuration() - player.getCurrentTime()) * 1000);
 		for(const player of this.players){
 			player.playVideo();
+		}
+		this.dispatchEvent(new Event('play'));
+	}
+	togglePlay(){
+		if(this.playing){
+			this.pause();
+		}else{
+			this.play();
 		}
 	}
 	prev(){
@@ -200,12 +226,12 @@ customElements.define('ul-playlist', class extends HTMLUListElement{
 		playlistUl.next();
 	});
 	play.addEventListener('click', () => {
-		if(playlistUl.playing){
-			playlistUl.pause();
-			play.textContent = 'play_arrow';
-		}else{
-			playlistUl.play();
-			play.textContent = 'pause';
-		}
+		playlistUl.togglePlay();
+	});
+	playlistUl.addEventListener('play', () => {
+		play.textContent = 'pause';
+	});
+	playlistUl.addEventListener('pause', () => {
+		play.textContent = 'play_arrow';
 	});
 })();

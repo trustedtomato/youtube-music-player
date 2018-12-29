@@ -16,6 +16,7 @@
   "devDependencies": {},
   "scripts": {
     "build": "webpack --config webpack.prod.js",
+    "build-docs": "node ./build-docs.js",
     "start": "webpack-dev-server --open --config webpack.dev.js"
   },
   "author": "Halasi Tamas",
