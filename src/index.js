@@ -2,46 +2,56 @@ import Sortable from 'sortablejs'
 
 /*--- YouTube API wrappers  ---*/
 // ouch why is this YouTube iframe api so bad...
-const createYtPlayer = (function(){
-	const inv = document.createElement('div');
-	inv.style.display = 'none';
-	document.body.appendChild(inv);
-	return (videoId, container = inv) => new Promise(resolve => {
-		const el = document.createElement('div');
-		container.appendChild(el);
-		
-		const player = new YT.Player(el, {
-			height: 200,
-			width: 200,
-			videoId,
-			playerVars: {
-				controls: 0,
-				origin: window.origin,
-				fs: 0,
-				disablekb: 1
-			},
-			events: {
-				'onReady': () => {
-					setBestSoundQuality(player);
-					player.setVolume(100);
-					const iframe = player.getIframe();
-					iframe.removeAttribute('allowfullscreen');
-					iframe.setAttribute('donotallowfullscreen', '');
-					resolve(player);
-				}
+const createYtPlayer = (videoId, container) => new Promise(resolve => {
+	const el = document.createElement('iframe');
+	el.frameBorder = 0;
+	el.setAttribute('allow', 'accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture');
+	el.setAttribute('donotallowfullscreen', '');
+	el.src = 'https://www.youtube.com/embed/' + videoId + '?disablekb=1&enablejsapi=1&controls=0&origin=' + encodeURIComponent(window.origin);
+	container.appendChild(el);
+	
+	const player = new YT.Player(el, {
+		playerVars: {
+			controls: 0,
+			origin: window.origin,
+			fs: 0,
+			disablekb: 1
+		},
+		events: {
+			'onReady': () => {
+				setBestSoundQuality(player);
+				player.setVolume(100);
+				resolve(player);
 			}
-		});
+		}
 	});
-})();
+});
 
-const getYtPlayerTitle = player => player.getVideoData().title;
-
-const expFunc = x => Math.cos(x * 0.5 * Math.PI);
+const destroyYtPlayer = player => {
+	// currently, the doc says that the destroy method just removes the iframe
+	// but IRL it replaces it with a div, which is not desired,
+	// so I just remove the iframe instead.
+	player.getIframe().remove();
+};
 
 const setBestSoundQuality = player => {
 	// the best sound quality is at 720p and up
 	player.setPlaybackQuality('hd720');
-}
+};
+
+const getYtVideoTitle = (function(){
+	const inv = document.createElement('div');
+	inv.style.display = 'none';
+	document.body.appendChild(inv);
+	return videoId => createYtPlayer(videoId, inv)
+		.then(player => {
+			const title = player.getVideoData().title;
+			destroyYtPlayer(player);
+			return title;
+		})
+})();
+
+const expFunc = x => Math.cos(x * 0.5 * Math.PI);
 
 const youtubeApiReady = new Promise(resolve => {
 	window.onYouTubeIframeAPIReady = resolve;
@@ -61,14 +71,15 @@ const parseYtVideoId = input => getYtVideoId(new URL(input)) || input;
 
 const last = arr => arr[arr.length - 1];
 
-const requestAnimFrame = () => new Promise(requestAnimationFrame);
-
 customElements.define('li-track', class extends HTMLLIElement{
 	constructor(){
 		super();
 	}
 	createYtPlayer(container){
 		return createYtPlayer(this.dataset.id, container);
+	}
+	getTitle(){
+		return getYtVideoTitle(this.dataset.id);
 	}
 	connectedCallback(){
 		// if already initalized in this document, just return
@@ -80,8 +91,7 @@ customElements.define('li-track', class extends HTMLLIElement{
 
 		const text = children.querySelector('.text');
 		text.textContent = `Loading ${id}...`;
-		this.createYtPlayer()
-			.then(getYtPlayerTitle)
+		this.getTitle()
 			.then(title => {
 				text.textContent = title;
 			});
@@ -119,10 +129,10 @@ customElements.define('ul-playlist', class extends HTMLUListElement{
 		}
 	}
 	nextElement(child){
-		return child.nextElementSibling || this.firstElementChild;
+		return child && (child.nextElementSibling || this.firstElementChild);
 	}
 	prevElement(child){
-		return child.previousElementSibling || this.lastElementChild;
+		return child && (child.previousElementSibling || this.lastElementChild);
 	}
 	start(child){
 		clearTimeout(this.endTimeout);
@@ -134,10 +144,7 @@ customElements.define('ul-playlist', class extends HTMLUListElement{
 		child.dataset.playing = true;
 		child.createYtPlayer(this.videoContainer).then(async player => {
 			for(const player of this.players){
-				// currently, the doc says that the destroy method just removes the iframe
-				// but IRL it replaces it with a div, which is not desired,
-				// so I just remove the iframe instead.
-				player.getIframe().remove();
+				destroyYtPlayer(player);
 			}
 			this.players = [player];
 			player.addEventListener('onStateChange', e => {
@@ -151,7 +158,7 @@ customElements.define('ul-playlist', class extends HTMLUListElement{
 				}
 			});
 			if(this.playing){
-				this.play();
+				this._play();
 			}
 		});
 	}
@@ -167,16 +174,13 @@ customElements.define('ul-playlist', class extends HTMLUListElement{
 		if(!this.playing) return;
 		clearTimeout(this.endTimeout);
 		this.playing = false;
-		for(player of this.players){
+		this.dispatchEvent(new Event('pause'));
+		for(const player of this.players){
 			player.pauseVideo();
 		}
-		this.dispatchEvent(new Event('pause'));
 	}
-	play(){
-		if(this.playing) return;
-		this.playing = true;
+	_play(){
 		if(this.players.length === 0) return;
-
 		const player = last(this.players);
 		this.endTimeout = setTimeout(() => {
 			this.start(this.nextElement(this.currentChild));
@@ -184,7 +188,12 @@ customElements.define('ul-playlist', class extends HTMLUListElement{
 		for(const player of this.players){
 			player.playVideo();
 		}
+	}
+	play(){
+		if(this.playing) return;
+		this.playing = true;
 		this.dispatchEvent(new Event('play'));
+		this._play();
 	}
 	togglePlay(){
 		if(this.playing){
