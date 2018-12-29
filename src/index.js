@@ -157,6 +157,7 @@ customElements.define('ul-playlist', class extends HTMLUListElement{
 						break;
 				}
 			});
+			console.log('playing: ' + this.playing);
 			if(this.playing){
 				this._play();
 			}
@@ -188,6 +189,7 @@ customElements.define('ul-playlist', class extends HTMLUListElement{
 		for(const player of this.players){
 			player.playVideo();
 		}
+		console.log('started playing!');
 	}
 	play(){
 		if(this.playing) return;
